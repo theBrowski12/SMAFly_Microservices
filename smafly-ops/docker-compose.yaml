@@ -1,0 +1,296 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - smafly-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    networks:
+      - smafly-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - smafly-network
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo-inventory
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: inventory_db
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - smafly-network
+
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:26.0
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./realm-export.json:/opt/keycloak/data/import/realm.json
+    command: start-dev --import-realm
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: http://localhost\r\nConnection: close\r\n\r\n' >&3;cat <&3 | grep -q '200 OK'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - smafly-network
+
+  smafly-mysql-service:
+    image: mysql:8.0
+    container_name: smafly-mysql-service
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot" ]
+      interval: 10s
+      retries: 10
+    networks:
+      - smafly-network
+
+  discovery-service:
+    container_name: discovery-service
+    build:
+      context: ./Discovery_Service
+      dockerfile: Dockerfile
+    ports:
+      - "8761:8761"
+    networks:
+      - smafly-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  config-service:
+    container_name: config-service
+    build:
+      context: ./Configuration_Service
+      dockerfile: Dockerfile
+    ports:
+      - "9999:9999"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/actuator/health"]
+      interval: 10s
+      retries: 5
+    networks:
+      - smafly-network
+
+  gateway-service:
+    container_name: gateway-service
+    build:
+      context: ./Gateway_Service
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8888/actuator/health" ]
+      interval: 10s
+      retries: 5
+    networks:
+      - smafly-network
+
+  notification-service:
+    container_name: notification-service
+    build:
+      context: ./NotificationService
+      dockerfile: Dockerfile
+    ports:
+      - "8089:8089"
+    depends_on:
+      - kafka
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_MAIL_USERNAME: simo.bambou@gmail.com
+      SPRING_MAIL_PASSWORD: "xjdv uuwi bkqc fstb"
+    networks:
+      - smafly-network
+
+  inventory-service:
+    container_name: inventory-service
+    build:
+      context: ./Inventory_Service
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    depends_on:
+      - redis
+      - mongo
+      - discovery-service
+      - keycloak
+    environment:
+      MONGO_URI: mongodb://mongo-inventory:27017/inventory_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EUREKA_HOST: discovery-service
+      EUREKA_PORT: 8761
+      FLIGHT_SERVICE_URL: http://flight-service:8081
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/SMAFly
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/SMAFly/protocol/openid-connect/certs
+    networks:
+      - smafly-network
+
+  ml-service:
+    container_name: ml-service
+    build:
+      context: ./ML_Service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - smafly-network
+
+  flight-service:
+    build: ./Flight-Service
+    container_name: flight-service
+    ports:
+      - '8081:8081'
+    environment:
+      - CONFIG_SERVICE_URL=http://config-service:9999
+      - DISCOVERY_SERVICE_URL=http://discovery-service:8761/eureka
+      - DB_URL=jdbc:mysql://smafly-mysql-service:3306/flight_db?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/SMAFly
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      retries: 4
+    depends_on:
+      smafly-mysql-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - smafly-network
+
+  booking-service:
+    build: ./BookingService
+    container_name: booking-service
+    ports:
+      - '8086:8086'
+    environment:
+      - CONFIG_SERVICE_URL=http://config-service:9999
+      - DISCOVERY_SERVICE_URL=http://discovery-service:8761/eureka
+      - DB_URL=jdbc:mysql://smafly-mysql-service:3306/booking_db?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/SMAFly
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8086/actuator/health" ]
+      interval: 30s
+      retries: 4
+    depends_on:
+      smafly-mysql-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - smafly-network
+
+  checkin-service:
+    build: ./CheckIn_Service
+    container_name: checkin-service
+    ports:
+      - '8083:8083'
+    environment:
+      - CONFIG_SERVICE_URL=http://config-service:9999
+      - DISCOVERY_SERVICE_URL=http://discovery-service:8761/eureka
+      - DB_URL=jdbc:mysql://smafly-mysql-service:3306/SMA_Checkins?createDatabaseIfNotExist=true
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/SMAFly
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8083/actuator/health" ]
+      interval: 30s
+      retries: 4
+    depends_on:
+      smafly-mysql-service:
+        condition: service_healthy
+      config-service:
+        condition: service_healthy
+      discovery-service:
+        condition: service_healthy
+    networks:
+      - smafly-network
+
+  front-app-service:
+    build: ./FrontApp
+    container_name: front-app-service
+    ports:
+      - "4200:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - smafly-network
+volumes:
+  mongo_data:
+  mysql_data:
+networks:
+  smafly-network:
+    driver: bridge
