@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="Discovery_Service" />
+        <module name="SMA_Fly" />
+        <module name="Gateway_Service" />
+        <module name="Configuration_Service" />
+      </profile>
+      <profile name="Annotation profile for NotifcationService" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
+        </processorPath>
+        <module name="BookingService" />
+        <module name="CheckIn_Service" />
+        <module name="Flight-Service" />
+        <module name="NotifcationService" />
+      </profile>
+    </annotationProcessing>
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="BookingService" options="-parameters" />
+      <module name="CheckIn_Service" options="-parameters" />
+      <module name="Configuration_Service" options="-parameters" />
+      <module name="Discovery_Service" options="-parameters" />
+      <module name="Flight-Service" options="-parameters" />
+      <module name="Gateway_Service" options="-parameters" />
+      <module name="NotifcationService" options="-parameters" />
+      <module name="SMA_Fly" options="-parameters" />
+    </option>
+  </component>
+</project>

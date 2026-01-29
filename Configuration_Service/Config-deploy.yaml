@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: faculty-config-service
+  name: smafly-config-service
   labels:
-    app: faculty-config-service
+    app: smafly-config-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: faculty-config-service
+      app: smafly-config-service
   template:
     metadata:
       labels:
-        app: faculty-config-service
+        app: smafly-config-service
     spec:
       containers:
-        - name: faculty-config-service
-          image: faculty_management-faculty-config-service:latest
+        - name: smafly-config-service
+          image: smafly_management-smafly-config-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9999
           env:
             - name: DISCOVERY_SERVICE_URL
-              value: "http://faculty-discovery-service:8761/eureka"
+              value: "http://smafly-discovery-service:8761/eureka"
           readinessProbe:
             httpGet:
               path: /actuator/health
@@ -34,11 +34,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: faculty-config-service
+  name: smafly-config-service
 spec:
   type: LoadBalancer
   selector:
-    app: faculty-config-service
+    app: smafly-config-service
   ports:
     - port: 9999
       targetPort: 9999

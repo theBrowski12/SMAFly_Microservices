@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Booking_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/CheckIn_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Configuration_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Discovery_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Flight-Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/FrontApp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Gateway_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Inventory_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ML_Service" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/NotificationService" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SMAfly_Config" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/SMAfly_Config_local" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/smafly-ops" vcs="Git" />
+  </component>
+</project>
